@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jigsaw Puzzle</title>
+<style>
+body { margin:0; font-family:system-ui; background:#0f0f10; color:white; text-align:center; }
+
+h1 { margin:20px 0 5px; }
+
+.topbar { display:flex; justify-content:center; gap:20px; font-size:14px; opacity:0.8; }
+
+.grid { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; width:300px; margin:20px auto; }
+
+.tile {
+  width:100px; height:100px;
+  background-size:300px 300px;
+  cursor:pointer; border-radius:6px;
+}
+
+.empty { background:#1c1c1f; cursor:default; }
+
+.controls { margin:15px; }
+
+button {
+  margin:5px; padding:10px 14px;
+  border:none; border-radius:8px;
+  background:#2a2a2e; color:white; cursor:pointer;
+}
+
+button:hover { background:#3a3a40; }
+
+#message { margin-top:10px; font-size:16px; color:#4caf50; }
+</style>
+</head>
+<body>
+
+<div style="width:100%; padding:12px 0; background:linear-gradient(90deg,#1a2a6c,#2a5298); font-size:14px; font-weight:500; letter-spacing:0.3px;">
+  Process Lifecycle Diagram • Jigsaw Puzzle / Puzzle Builder
+</div>
+
+<h1>Jigsaw Puzzle</h1>
+<div class="topbar">
+  <div>⏱ Time: <span id="time">0</span>s</div>
+  <div>⭐ Score: <span id="score">0</span></div>
+</div>
+
+<div class="grid" id="grid"></div>
+<div id="message"></div>
+
+<div class="controls">
+  <button onclick="undo()">Undo</button>
+  <button onclick="redo()">Redo</button>
+  <button onclick="newPuzzle()">New Puzzle</button>
+</div>
+
+<script>
+const grid = document.getElementById("grid");
+const timeEl = document.getElementById("time");
+const scoreEl = document.getElementById("score");
+const messageEl = document.getElementById("message");
+
+// 🔥 Multiple puzzle images
+const images = [
+  "https://picsum.photos/id/1011/300",
+  "https://picsum.photos/id/1025/300",
+  "https://picsum.photos/id/1043/300",
+  "https://picsum.photos/id/1069/300"
+];
+
+let currentImage = images[0];
+
+// 🔊 Sound effects
+const moveSound = new Audio("https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b0a2b.mp3");
+const winSound = new Audio("https://cdn.pixabay.com/audio/2022/03/15/audio_2b0d8c2e5b.mp3");
+
+let tiles = [];
+let history = [];
+let redoStack = [];
+let timer = 0;
+let interval;
+let score = 0;
+
+function startTimer() {
+  clearInterval(interval);
+  timer = 0;
+  timeEl.innerText = timer;
+  interval = setInterval(() => {
+    timer++;
+    timeEl.innerText = timer;
+  }, 1000);
+}
+
+function saveState() {
+  history.push([...tiles]);
+  redoStack = [];
+}
+
+function createTiles() {
+  tiles = [];
+  grid.innerHTML = "";
+  history = [];
+  redoStack = [];
+
+  for (let i = 0; i < 9; i++) {
+    const div = document.createElement("div");
+    div.classList.add("tile");
+
+    if (i === 8) {
+      div.classList.add("empty");
+    } else {
+      const x = (i % 3) * -100;
+      const y = Math.floor(i / 3) * -100;
+      div.style.backgroundImage = `url(${currentImage})`;
+      div.style.backgroundPosition = `${x}px ${y}px`;
+    }
+
+    div.dataset.correct = i;
+    div.addEventListener("click", () => moveTile(div));
+
+    tiles.push(div);
+    grid.appendChild(div);
+  }
+}
+
+function moveTile(tile) {
+  const i = tiles.indexOf(tile);
+  const emptyIndex = tiles.findIndex(t => t.classList.contains("empty"));
+
+  const validMoves = [i - 1, i + 1, i - 3, i + 3];
+
+  if (validMoves.includes(emptyIndex)) {
+    saveState();
+    [tiles[i], tiles[emptyIndex]] = [tiles[emptyIndex], tiles[i]];
+    render();
+    moveSound.play();
+    checkWin();
+  }
+}
+
+function render() {
+  grid.innerHTML = "";
+  tiles.forEach(t => grid.appendChild(t));
+}
+
+function shuffle() {
+  for (let i = 0; i < 50; i++) {
+    const emptyIndex = tiles.findIndex(t => t.classList.contains("empty"));
+    const moves = [emptyIndex - 1, emptyIndex + 1, emptyIndex - 3, emptyIndex + 3]
+      .filter(i => i >= 0 && i < 9);
+    const rand = moves[Math.floor(Math.random() * moves.length)];
+    [tiles[emptyIndex], tiles[rand]] = [tiles[rand], tiles[emptyIndex]];
+  }
+  render();
+  messageEl.innerText = "";
+  startTimer();
+}
+
+function undo() {
+  if (history.length > 0) {
+    redoStack.push([...tiles]);
+    tiles = history.pop();
+    render();
+  }
+}
+
+function redo() {
+  if (redoStack.length > 0) {
+    history.push([...tiles]);
+    tiles = redoStack.pop();
+    render();
+  }
+}
+
+function newPuzzle() {
+  // 🔥 change image randomly
+  currentImage = images[Math.floor(Math.random() * images.length)];
+  createTiles();
+  shuffle();
+}
+
+function checkWin() {
+  let win = true;
+
+  for (let i = 0; i < tiles.length; i++) {
+    if (tiles[i].dataset.correct != i) {
+      win = false;
+      break;
+    }
+  }
+
+  if (win) {
+    clearInterval(interval);
+    score += Math.max(100 - timer, 10);
+    scoreEl.innerText = score;
+    messageEl.innerText = "🎉 You Solved It!";
+    winSound.play();
+
+    setTimeout(() => {
+      newPuzzle();
+    }, 1500);
+  }
+}
+
+createTiles();
+shuffle();
+</script>
+
+</body>
+</html>
