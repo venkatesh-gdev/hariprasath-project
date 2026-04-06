@@ -53,6 +53,7 @@ button:hover { background:#3a3a40; }
   <button onclick="undo()">Undo</button>
   <button onclick="redo()">Redo</button>
   <button onclick="newPuzzle()">New Puzzle</button>
+  <button onclick="solvePuzzle()">Solve</button>
 </div>
 
 <script>
@@ -61,7 +62,6 @@ const timeEl = document.getElementById("time");
 const scoreEl = document.getElementById("score");
 const messageEl = document.getElementById("message");
 
-// 🔥 Multiple puzzle images
 const images = [
   "https://picsum.photos/id/1011/300",
   "https://picsum.photos/id/1025/300",
@@ -69,9 +69,9 @@ const images = [
   "https://picsum.photos/id/1069/300"
 ];
 
+let usedImages = [];
 let currentImage = images[0];
 
-// 🔊 Sound effects
 const moveSound = new Audio("https://cdn.pixabay.com/audio/2022/03/15/audio_115b9b0a2b.mp3");
 const winSound = new Audio("https://cdn.pixabay.com/audio/2022/03/15/audio_2b0d8c2e5b.mp3");
 
@@ -173,11 +173,42 @@ function redo() {
   }
 }
 
+function getUniqueImage() {
+  if (usedImages.length === images.length) usedImages = [];
+
+  let img;
+  do {
+    img = images[Math.floor(Math.random() * images.length)];
+  } while (usedImages.includes(img));
+
+  usedImages.push(img);
+  return img;
+}
+
 function newPuzzle() {
-  // 🔥 change image randomly
-  currentImage = images[Math.floor(Math.random() * images.length)];
+  currentImage = getUniqueImage();
   createTiles();
   shuffle();
+}
+
+function solvePuzzle() {
+  // instant solve
+  tiles.sort((a, b) => Number(a.dataset.correct) - Number(b.dataset.correct));
+  render();
+  clearInterval(interval);
+
+  // give score (slightly less than normal solve)
+  const gained = Math.max(50 - Math.floor(timer/2), 5);
+  score += gained;
+  scoreEl.innerText = score;
+
+  messageEl.innerText = "⚡ Auto Solved! +" + gained;
+  winSound.play();
+
+  setTimeout(() => {
+    newPuzzle();
+  }, 1200);
+}, 1200);
 }
 
 function checkWin() {
